@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Absensi Kelas - NFC</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .nfc-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .nfc-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: pulse 3s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+        
+        .tap-animation {
+            animation: tap 0.3s ease-in-out;
+        }
+        
+        @keyframes tap {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.95); }
+            100% { transform: scale(1); }
+        }
+        
+        .status-hadir { background: linear-gradient(135deg, #4ade80, #22c55e); }
+        .status-sakit { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
+        .status-alpha { background: linear-gradient(135deg, #f87171, #ef4444); }
+        
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .nfc-reader {
+            border: 3px dashed #94a3b8;
+            border-radius: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .nfc-reader.active {
+            border-color: #3b82f6;
+            background-color: rgba(59, 130, 246, 0.05);
+            animation: glow 2s ease-in-out infinite;
+        }
+        
+        @keyframes glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.3); }
+            50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.6); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-blue-600 p-2 rounded-lg">
+                        <i class="fas fa-user-check text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">Sistem Absensi Kelas</h1>
+                        <p class="text-gray-600 text-sm">NFC Tap Card System</p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-2xl font-bold text-gray-800" id="currentTime"></div>
+                    <div class="text-sm text-gray-600" id="currentDate"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-4 py-8">
+        <div class="grid lg:grid-cols-3 gap-8">
+            <!-- NFC Reader Section -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-2xl shadow-lg p-6 mb-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-wifi text-blue-600 mr-2"></i>
+                        NFC Reader
+                    </h2>
+                    
+                    <!-- NFC Status -->
+                    <div class="text-center mb-6">
+                        <div class="inline-block px-4 py-2 rounded-full text-sm font-medium" id="nfcStatus">
+                            <i class="fas fa-circle text-green-500 mr-2"></i>
+                            Ready to Scan
+                        </div>
+                    </div>
+                    
+                    <!-- NFC Card Area -->
+                    <div class="nfc-reader p-8 text-center mb-6" id="nfcReader">
+                        <div class="mb-4">
+                            <i class="fas fa-credit-card text-6xl text-gray-400 mb-4"></i>
+                        </div>
+                        <p class="text-gray-600 font-medium">Tap kartu Anda di sini</p>
+                        <p class="text-sm text-gray-500 mt-2">atau klik untuk simulasi</p>
+                    </div>
+                    
+                    <!-- Student Card Simulation -->
+                    <div class="space-y-3">
+                        <h3 class="font-medium text-gray-700">Simulasi Kartu Siswa:</h3>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button class="student-card bg-gradient-to-r from-blue-500 to-blue-600 text-white p-3 rounded-lg text-sm font-medium hover:from-blue-600 hover:to-blue-700 transition-all" data-student="Ahmad Rizki">
+                                Ahmad Rizki
+                            </button>
+                            <button class="student-card bg-gradient-to-r from-green-500 to-green-600 text-white p-3 rounded-lg text-sm font-medium hover:from-green-600 hover:to-green-700 transition-all" data-student="Siti Nurhaliza">
+                                Siti Nurhaliza
+                            </button>
+                            <button class="student-card bg-gradient-to-r from-purple-500 to-purple-600 text-white p-3 rounded-lg text-sm font-medium hover:from-purple-600 hover:to-purple-700 transition-all" data-student="Budi Santoso">
+                                Budi Santoso
+                            </button>
+                            <button class="student-card bg-gradient-to-r from-orange-500 to-orange-600 text-white p-3 rounded-lg text-sm font-medium hover:from-orange-600 hover:to-orange-700 transition-all" data-student="Dewi Lestari">
+                                Dewi Lestari
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Settings -->
+                <div class="bg-white rounded-2xl shadow-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                        <i class="fas fa-cog text-gray-600 mr-2"></i>
+                        Pengaturan
+                    </h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Jam Masuk Kelas</label>
+                            <input type="time" id="jamMasuk" value="08:00" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Batas Keterlambatan (menit)</label>
+                            <input type="number" id="batasLambat" value="15" min="0" max="60"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Attendance List -->
+            <div class="lg:col-span-2">
+                <!-- Stats Cards -->
+                <div class="grid md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Total Hadir</p>
+                                <p class="text-3xl font-bold text-green-600" id="totalHadir">0</p>
+                            </div>
+                            <div class="bg-green-100 p-3 rounded-full">
+                                <i class="fas fa-user-check text-green-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Sakit</p>
+                                <p class="text-3xl font-bold text-yellow-600" id="totalSakit">0</p>
+                            </div>
+                            <div class="bg-yellow-100 p-3 rounded-full">
+                                <i class="fas fa-user-injured text-yellow-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-lg p-6 card-hover">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-600">Alpha</p>
+                                <p class="text-3xl font-bold text-red-600" id="totalAlpha">0</p>
+                            </div>
+                            <div class="bg-red-100 p-3 rounded-full">
+                                <i class="fas fa-user-times text-red-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Attendance List -->
+                <div class="bg-white rounded-2xl shadow-lg">
+                    <div class="p-6 border-b border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-xl font-semibold text-gray-800 flex items-center">
+                                <i class="fas fa-list-alt text-blue-600 mr-2"></i>
+                                Daftar Absensi Hari Ini
+                            </h2>
+                            <button id="clearAll" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm">
+                                <i class="fas fa-trash mr-2"></i>
+                                Clear All
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6">
+                        <div id="attendanceList" class="space-y-3">
+                            <div class="text-center py-8 text-gray-500">
+                                <i class="fas fa-clipboard-list text-4xl mb-3"></i>
+                                <p>Belum ada absensi hari ini</p>
+                                <p class="text-sm">Tap kartu untuk memulai absensi</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal for Late Attendance -->
+    <div id="lateModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-6 m-4 max-w-md w-full">
+            <div class="text-center mb-6">
+                <div class="bg-yellow-100 rounded-full p-3 inline-block mb-3">
+                    <i class="fas fa-exclamation-triangle text-yellow-600 text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-800">Siswa Terlambat</h3>
+                <p class="text-gray-600 mt-2">Pilih status kehadiran:</p>
+                <p class="text-sm text-gray-500 mt-1" id="studentName"></p>
+            </div>
+            
+            <div class="space-y-3">
+                <button id="hadirLambat" class="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-medium transition-colors">
+                    <i class="fas fa-user-check mr-2"></i>
+                    Hadir (Terlambat)
+                </button>
+                <button id="sakitBtn" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-lg font-medium transition-colors">
+                    <i class="fas fa-user-injured mr-2"></i>
+                    Sakit
+                </button>
+                <button id="alphaBtn" class="w-full bg-red-500 hover:bg-red-600 text-white py-3 rounded-lg font-medium transition-colors">
+                    <i class="fas fa-user-times mr-2"></i>
+                    Alpha
+                </button>
+            </div>
+            
+            <button id="closeModal" class="w-full mt-4 bg-gray-300 hover:bg-gray-400 text-gray-700 py-2 rounded-lg font-medium transition-colors">
+                Batal
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let attendanceData = [];
+        let currentStudent = null;
+        
+        // Time and date functions
+        function updateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('id-ID');
+            const dateString = now.toLocaleDateString('id-ID', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+            
+            document.getElementById('currentTime').textContent = timeString;
+            document.getElementById('currentDate').textContent = dateString;
+        }
+        
+        // Check if student is late
+        function isLate() {
+            const now = new Date();
+            const jamMasuk = document.getElementById('jamMasuk').value;
+            const batasLambat = parseInt(document.getElementById('batasLambat').value);
+            
+            const [jamMasukHour, jamMasukMinute] = jamMasuk.split(':').map(Number);
+            const masukTime = new Date();
+            masukTime.setHours(jamMasukHour, jamMasukMinute, 0, 0);
+            
+            const batasTime = new Date(masukTime.getTime() + batasLambat * 60000);
+            
+            return now > batasTime;
+        }
+        
+        // Add attendance record
+        function addAttendance(studentName, status, note = '') {
+            const now = new Date();
+            const existingIndex = attendanceData.findIndex(item => item.name === studentName);
+            
+            if (existingIndex !== -1) {
+                attendanceData[existingIndex] = {
+                    name: studentName,
+                    status: status,
+                    time: now,
+                    note: note
+                };
+            } else {
+                attendanceData.push({
+                    name: studentName,
+                    status: status,
+                    time: now,
+                    note: note
+                });
+            }
+            
+            updateAttendanceDisplay();
+            updateStats();
+        }
+        
+        // Update attendance display
+        function updateAttendanceDisplay() {
+            const attendanceList = document.getElementById('attendanceList');
+            
+            if (attendanceData.length === 0) {
+                attendanceList.innerHTML = `
+                    <div class="text-center py-8 text-gray-500">
+                        <i class="fas fa-clipboard-list text-4xl mb-3"></i>
+                        <p>Belum ada absensi hari ini</p>
+                        <p class="text-sm">Tap kartu untuk memulai absensi</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            attendanceList.innerHTML = attendanceData.map(item => {
+                const statusClass = {
+                    'Hadir': 'status-hadir',
+                    'Sakit': 'status-sakit',
+                    'Alpha': 'status-alpha'
+                }[item.status] || 'bg-gray-500';
+                
+                const statusIcon = {
+                    'Hadir': 'fa-user-check',
+                    'Sakit': 'fa-user-injured',
+                    'Alpha': 'fa-user-times'
+                }[item.status] || 'fa-user';
+                
+                return `
+                    <div class="flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:shadow-md transition-all">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 ${statusClass} rounded-full flex items-center justify-center">
+                                <i class="fas ${statusIcon} text-white"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-gray-800">${item.name}</h3>
+                                <p class="text-sm text-gray-600">${item.time.toLocaleTimeString('id-ID')}</p>
+                                ${item.note ? `<p class="text-xs text-gray-500">${item.note}</p>` : ''}
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="px-3 py-1 ${statusClass} text-white text-sm font-medium rounded-full">
+                                ${item.status}
+                            </span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Update statistics
+        function updateStats() {
+            const hadir = attendanceData.filter(item => item.status === 'Hadir').length;
+            const sakit = attendanceData.filter(item => item.status === 'Sakit').length;
+            const alpha = attendanceData.filter(item => item.status === 'Alpha').length;
+            
+            document.getElementById('totalHadir').textContent = hadir;
+            document.getElementById('totalSakit').textContent = sakit;
+            document.getElementById('totalAlpha').textContent = alpha;
+        }
+        
+        // Handle NFC tap simulation
+        function handleNFCTap(studentName) {
+            currentStudent = studentName;
+            
+            // Animate NFC reader
+            const nfcReader = document.getElementById('nfcReader');
+            nfcReader.classList.add('active');
+            
+            // Update NFC status
+            document.getElementById('nfcStatus').innerHTML = `
+                <i class="fas fa-circle text-blue-500 mr-2"></i>
+                Card Detected: ${studentName}
+            `;
+            
+            setTimeout(() => {
+                nfcReader.classList.remove('active');
+                
+                if (isLate()) {
+                    showLateModal(studentName);
+                } else {
+                    addAttendance(studentName, 'Hadir');
+                    document.getElementById('nfcStatus').innerHTML = `
+                        <i class="fas fa-circle text-green-500 mr-2"></i>
+                        Ready to Scan
+                    `;
+                }
+            }, 1000);
+        }
+        
+        // Show late modal
+        function showLateModal(studentName) {
+            document.getElementById('studentName').textContent = studentName;
+            document.getElementById('lateModal').classList.remove('hidden');
+            document.getElementById('lateModal').classList.add('flex');
+        }
+        
+        // Hide late modal
+        function hideLateModal() {
+            document.getElementById('lateModal').classLi}
